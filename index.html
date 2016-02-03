@@ -1,0 +1,469 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Presidential Election Turnout Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <!-- CSS -->
+    <link href="./bootstrap/css/bootstrap.css" rel="stylesheet" />
+    <link href="./assets/css/main.css" rel="stylesheet" />
+    <link href="./bootstrap/css/bootstrap-responsive.css" rel="stylesheet" />
+	<script src="./bootstrap/js/jquery.js"></script>
+    <script src="./bootstrap/js/bootstrap-button.js"></script>
+    <script src="./bootstrap/js/bootstrap-tooltip.js"></script>
+
+	<script src="https://maps.googleapis.com/maps/api/js?v=3&sensor=false&key=AIzaSyAVGADAnBgB4c0j-kK_y-GN-Geli7k1AKU"
+            type="text/javascript"></script>
+			
+			
+	<style type="text/css">
+		div.btn-group[data-toggle=buttons-radio] input[type=radio] {
+		  display:    block;
+		  position:   absolute;
+		  top:        0;
+		  left:       0;
+		  width:      100%;
+		  height:     100%;
+		  opacity:    0;
+		}​
+	</style>
+   <script type="text/javascript">
+		var map;
+		var kmlLayer; 
+		var currentMode = "vep"; // Either VEP or Turnout
+		var currentYear = 2012;
+		var markers = [];
+		var isViewCities = true;
+		var legendObject = 
+		{
+			vep: {
+				2012: {data:["0 - 1,500,000", "1,500,001 - 5,720,000" , "5,720,001 - 23,000,000"]},
+				2008: {data:["0 - 1,380,000", "1,380,001- 5,400,000", "5,400,000- 22,300,000"]},
+				2004: {data:["0 - 1,800,000", "1,800,001 - 5,250,000", "5,250,001- 21,100,000"]}, 
+				2000: {data:["0 - 1,200,000", "1,200,001- 4,000,000", "4,000,001 - 20,000,000"]}, 
+				1996: {data:["0  - 1,470,000", "1,470,001 - 5,270,000", " 5,270,001 - 18,600,000"]},
+				1992: {data:["0 - 1,090,000", "1,090,001- 4,180,000", " 4,180,000 - 18,460,000"]},
+				1988: {data:["0 - 1,070,000", "1,070,001 - 4,260,000", "4,260,001 - 17,700,000"]},
+				1984: {data:["0 - 770,000", "770,001 - 3,200,000", " 3,200,001 - 16,600,000"]},
+				1980: {data:["0  - 930,000", "930,001 - 3,740,000", "3,740,001 - 15,600,000"]}
+			},
+			turnout: {
+				2012: {data:["0% - 50%", "50.5% - 60%", "60.5% - 100%"]},
+				2008: {data:["0%- 60%", "60.5% - 67%", "67.5%- 100%"]}, 
+				2004: {data:["0% - 58%", "58.5%- 63%", "63.5% - 100%"]}, 
+				2000: {data:["0% - 50%", "50.5% - 57%", "57.5% - 100%"]}, 
+				1996: {data:["0% - 50%", "50.5% - 57%", "57.5% - 100%"]},
+				1992: {data:["0% - 57%", "57.5% - 64%", "64.5% - 100%"]},
+				1988: {data:["0% - 50%", "50.5% - 58%", "58% - 100%"]},
+				1984: {data:["0% - 54%", "54.5% - 62%", "62.5% - 100%"]},
+				1980: {data:["0% - 51%", "51.5% - 58%", "58.5% - 100%"]}
+			}
+		};
+		
+		function initialize() {
+			//var usCenter = new google.maps.LatLng(40.446947,-99.407593); // the true center
+			var usCenter = new google.maps.LatLng(37.160317,-89.57373)
+			var mapOptions = {
+			 zoom: 4,
+			 center: usCenter,
+			 mapTypeId: google.maps.MapTypeId.ROADMAP
+			};
+			map = new google.maps.Map(document.getElementById("map_canvas"),mapOptions); 
+			// need to set preserveViewport to true for resetting KML layer zoom
+			viewLayerByYear(currentYear);
+			layerCities(map);
+		} 
+	
+		function layerCities(map){
+			// Population = population estimate for year 2011
+			// 						 {lat: , lng: , name: , population: }, 
+			var data = [ {lat: 40.6643 , lng: -73.9385, name: "New York", population: "8,244,910"}, 
+						 {lat: 34.0194, lng: -118.4108, name: "Los Angeles", population: "3,819,702"}, 
+						 {lat: 41.8376, lng: -87.6818, name: "Chicago", population: "2,707,120"}, 
+						 {lat: 29.7805, lng: -95.3863, name: "Houston", population: "2,145,146"}, 
+						 {lat: 40.0094, lng: -75.1333, name: "Philadelphia", population: "1,536,471"}, 
+						 {lat: 33.5722, lng: -112.0880, name: "Phoenix", population: "1,469,471"}, 
+						 {lat: 29.4724, lng: -98.5251, name: "San Antonio", population: "1,359,758"}, 
+						 {lat: 32.8153, lng: -117.1350, name: "San Diego", population: "1,326,179"}, 
+						 {lat: 32.7942, lng: -96.7655, name: "Dallas", population: "1,223,229"} , 
+						 {lat: 37.2969, lng: -121.8193, name: "San Jose", population: "967,487"}, 
+						 {lat: 30.3370, lng:  -81.6613, name: "Jacksonville", population: "827,908"}, 
+						 {lat: 39.7767, lng: -86.1459, name: "Indianapolis", population: "827,609"}, 
+						 {lat: 30.3072, lng: -97.7560, name: "Austin", population: "820,611"}, 
+						 {lat: 37.7272, lng: -123.0322, name: "San Francisco", population: "812,826"}, 
+						 {lat: 39.9848, lng: -82.9850, name: "Columbus", population: "797,434"}, 
+						 {lat: 32.7795, lng:  -97.3463, name: "Fort Worth", population: "758,738"}, 
+						 {lat: 35.2087, lng: -80.8307, name: "Charlotte", population: "751,087"}, 
+						 {lat: 42.3830, lng:  -83.1022, name: "Detroit", population: "706,585"} /*, 
+						 
+						 {lat: 31.8484, lng:  -106.4270, name: "El Paso", population: "665,568"}, 
+						 {lat: 35.1035, lng: -89.9785, name: "Memphis", population: "652,050"}, 
+						 {lat: 42.3320, lng:  -71.0202, name: "Boston", population: "625,087"}, 
+						 {lat: 47.6205, lng: -122.3509, name: "Seattle", population: "620,778"}, 
+						 {lat: 39.7618, lng: -104.8806, name: "Denver", population: "619,968"}, 
+						 {lat: 39.3002, lng: -76.6105, name: "Baltimore", population: "619,493"}, 
+						 {lat: 38.9041, lng:  -77.0171, name: "Washington DC", population: "617,996"}, 
+						 {lat: 36.1718, lng: -86.7850, name: "Nashville", population: "609,644"}, 
+						 {lat: 38.1781, lng: -85.6667, name: "Louisville", population: "602,011"}, 
+						 {lat: 43.0633, lng: -87.9667, name: "Milwaukee", population: "597,867"}, 
+						 {lat: 45.5370, lng: -122.6500, name: "Portland", population: "593,820"}, 
+						 {lat: 35.4671, lng: -97.5137, name: "Oklahoma City", population: "591,967"}, 
+						 {lat: 36.2277, lng: -115.2640, name: "Las Vegas", population: "589,317"}, 
+						 {lat: 35.1056, lng: -106.6474, name: "Albuquerque", population: "552,804"}, 
+						 {lat: 32.1543, lng: -110.8711, name: "Tucson", population: "525,796"}, 
+						 {lat: 36.7827, lng: -119.7945, name: "Fresno", population: "501,362"} */
+			];
+			for (var i = 0; i < data.length; i++){
+				var curr = data[i];
+				var marker = new google.maps.Marker ( {
+					position : new google.maps.LatLng(curr.lat, curr.lng),
+					animation : google.maps.Animation.DROP, 
+					map: map,
+					title: curr.name,
+					visisble: true,
+					draggable: false,
+					flat: false
+				});
+				markers[i] = marker;
+			}
+		}
+		
+		// Whenever the check button is changed
+		function toggleCities(){
+			if (isViewCities == true){
+				isViewCities = false;
+			} else {
+				isViewCities = true;
+			}
+			for (var i = 0; i < markers.length; i++){
+				markers[i].setVisible(isViewCities);
+			}
+		}
+		
+		function addCommas(nStr) {
+			nStr += '';
+			x = nStr.split('.');
+			x1 = x[0];
+			x2 = x.length > 1 ? '.' + x[1] : '';
+			var rgx = /(\d+)(\d{3})/;
+			while (rgx.test(x1)) {
+				x1 = x1.replace(rgx, '$1' + ',' + '$2');
+			}
+			return x1 + x2;
+		}
+		function viewLayerByYear(year){
+			debugger;
+			var host = "http://vandershraaf.github.io/election-map/kml_layer/"; // Development
+			currentYear = year;
+			var link = host+currentYear+"/election_"+currentYear+"_"+currentMode+".kmz";
+			kmlLayer = new google.maps.KmlLayer(link, {preserveViewport: true, suppressInfoWindows: true}); 
+			kmlLayer.setMap(map);
+			var stateInfo;
+			// Add listener for clicking on KML layer, read data and output it differently
+			google.maps.event.addListener(kmlLayer, 'click',  function (event) {
+				var text = "<table class='table table-hover'>";
+				$(document).ready(function() {
+					var titleState = "";
+					var isState = false;
+					var isPercentage = false;
+					var isSeparator = false;
+					$("tr[bgcolor]", $(event.featureData.infoWindowHtml)).each(function (i) {
+						var isAttr = true;
+						$(this).children().each(function (j) {
+							var currentText = $(this).text();
+							if (j == 0){
+								if (currentText == "STATE_NAME"){
+									text += "<tr><td><strong>State Name </strong></td>";
+									if (isState == false){
+										isState = true;
+									}
+								} else if (currentText == "SUB_REGION"){
+									text += "<tr><td><strong>Sub Region </strong></td>";
+								} else if (currentText == "STATE_ABBR"){
+									text += "<tr><td><strong>State Abbreviation </strong></td>";
+								} else if (currentText == "Party_Won"){
+									text += "<tr><td><strong>Party Won </strong></td>";
+								} else if (currentText == "VEP_Turnout_Rate"){
+									text += "<tr><td><strong>VEP Turnout Rate </strong></td>";
+									isPercentage = true;
+								} else if (currentText == "VAP_Turnout_Rate"){
+									text += "<tr><td><strong>VAP Turnout Rate </strong></td>";
+									isPercentage = true;
+								} else if (currentText == "Voting_Eligible_Population"){
+									text += "<tr><td><strong>Voting Eligible Population (VEP) </strong></td>";
+									isSeparator = true;
+								} else if (currentText == "Total_Turnout"){
+									text += "<tr><td><strong>Total Turnout </strong></td>";
+								} else {
+									isAttr = false;
+								}
+							} else {
+								if (isAttr == true){
+									if (isState == true){
+										titleState = currentText;
+										isState = false;
+									}	
+									if (!isNaN(currentText)){
+										if (isPercentage == true){
+											if (currentText != null && currentText != ""){
+												var r = Math.round(currentText * 100);
+												currentText = r + "%";
+												isPercentage = false;
+											}
+										} else if (isSeparator == true){
+											var n = addCommas(Math.round(currentText));
+											currentText = n;
+										}
+									}	
+									text += "<td>"+currentText +"</td></tr>";
+								} else {
+									isAttr = true;
+								}
+								
+							}
+						});
+					});
+				});
+				text += "</table>";
+				var infoWindow = new google.maps.InfoWindow({
+					content: text,
+					position: event.latLng
+				});
+				infoWindow.open(map);
+			});
+			// Build the legend based on current layer mode and year
+			var legendInfo;
+			if (currentMode == "vep"){
+				legendInfo = legendObject.vep;
+			} else {
+				legendInfo = legendObject.turnout;
+			}
+			for (var prop in legendInfo){
+				if (prop == currentYear){
+					legendInfo = legendInfo[prop].data;
+					break;
+				}
+			}
+			$(document).ready(function() {
+				var title = "";
+				if (currentMode == "vep"){
+					title = "Voting-Eligible Population (VEP)";
+				} else {
+					title = "Turnout Rate"
+				}
+				$("h4.legendTitle").text(title+" "+currentYear);
+				$("tr.legendRow").each(function (i) {
+					$(this).children(".word").text(legendInfo[i]);
+				});
+				
+			});
+		}
+		
+		$(document).ready(function() {
+			$('div.btn-group').click(function(){
+				// Originally it was @name=.... but it did not work 
+				if ($("input[name=is_turnout]:checked").val() == 0){
+					currentMode = "vep";
+					viewLayerByYear(currentYear);
+				} else {
+					currentMode = "turnout";
+					viewLayerByYear(currentYear);
+				}
+			});
+		});
+	</script>
+	
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+   
+  </head>
+
+  <body onload="initialize()">
+	<div id="fb-root"></div>
+	<script>(function(d, s, id) {
+	  var js, fjs = d.getElementsByTagName(s)[0];
+	  if (d.getElementById(id)) return;
+	  js = d.createElement(s); js.id = id;
+	  js.src = "//connect.facebook.net/en_US/all.js#xfbml=1&appId=108656895930686";
+	  fjs.parentNode.insertBefore(js, fjs);
+	}(document, 'script', 'facebook-jssdk'));</script>
+	<div id="map_canvas" style="width: 100%; height: 100%; z-index:0"></div>
+
+	<div id="wrap" style="z-index:100; position: absolute; top: 70%; left: 5%">
+		  <!-- Begin page content -->
+		  <div class="container">
+			<div class="page-header">
+			  <h1>Presidential Election <br />Turnout Map</h1>
+			</div>
+		  </div>
+	</div>
+	
+	<div class="dropdown" 
+		 style="z-index:1001; position: absolute; top: 0%; left: 40%; background-color:white;
+				padding:20px; box-shadow: 5px 5px 5px #888888">
+		<table><tr><td>
+		<label class="checkbox"><input type="checkbox" checked="checked" onchange="toggleCities()" />Cities layer</label>
+		<a href="#" rel="tooltip" title="test" data-animation="true"></a>
+		<div class="btn-group" data-toggle="buttons-radio" >
+		  <button type="button" class="btn" data-toggle="button">
+			VEP
+			<input type="radio" name="is_turnout" value="0" />
+		  </button>
+		  <button type="button" class="btn" data-toggle="button">
+			Turnout
+			<input type="radio" name="is_turnout" value="1" />
+		  </button>
+		</div>​
+		<!-- TODO: Indicate which year has been selected -->
+		  <a class="dropdown-toggle btn btn-primary" data-toggle="dropdown" href="#">Select Year</a>
+		  <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(1980)">1980</a></li>
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(1984)">1984</a></li>
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(1988)">1988</a></li>
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(1992)">1992</a></li>
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(1996)">1996</a></li>
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(2000)">2000</a></li>
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(2004)">2004</a></li>
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(2008)">2008</a></li>
+			  <li><a tabindex="-1" href="#" onclick="viewLayerByYear(2012)">2012</a></li>
+		  </ul>
+		  </td></tr></table>
+		
+	</div>
+	<div class="legend" style="background-color:white; 
+				z-index:100; 
+				position:absolute;
+				left: 65%;
+				top: 65%;
+				padding: 10px 10px 10px 10px;
+				box-shadow: 5px 5px 5px #888888">
+			<h4 class="legendTitle">Voting-Eligible Population 2010</h4>
+			<table border="0" style="width: 100%; height:100%">
+				<tr><th>Republicans</th><th>Democrats</th></tr>
+			</table>
+			<table id="legend" border="0" style="width: 100%; height:100%">
+				<tr class="legendRow">
+					<td class="word">0 - 100</td>
+					<td><div style="z-index:100;background-color:#FFCCCC; width:50px; height:30px" /></td>
+					<td><div style="z-index:100;background-color:#B6EDF0; width:50px; height:30px" /></td>
+					<td class="word">0 - 100</td>
+				</tr>
+				<tr class="legendRow">
+					<td class="word">100 - 200</td>
+					<td><div style="z-index:100;background-color:#FA725A; width:50px; height:30px" /></td>
+					<td><div style="z-index:100;background-color:#1F83E0; width:50px; height:30px" /></td>
+					<td class="word">100 - 200</td>
+				</tr>
+				<tr class="legendRow">
+					<td class="word">200 - 300</td>
+					<td><div style="background-color:#DB0000; width:50px; height:30px" /></td>
+					<td><div style="background-color:#090991; width:50px; height:30px" /></td>
+					<td class="word">200 - 300</td>
+				</tr>
+			</table>
+	</div>
+	
+	<!-- About -->
+	<!-- Button to trigger modal -->
+	<div id="about" style="z-index:1001; position:absolute; top: 90%; left: 5%">
+		<a href="#myModal" role="button" class="btn btn-warning" data-toggle="modal">About</a>
+		 
+		<!-- Modal -->
+		<div id="myModal" class="modal hide fade" data-backdrop="false" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+		  <div class="modal-header">
+			<button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+			<h3 id="myModalLabel">About</h3>
+		  </div>
+		  <div class="modal-body">
+			<h4>Summary</h4>
+			<p>This is a web map of presidential election turnout from the year 1980 to 2012. </p>	
+			<br />
+			
+			<h4>Subjects</h4>
+			<ul>
+				<li><strong>Voting-Eligible Population (also called as VEP)</strong>: Number of person who is
+				eligible to vote. This excludes non-citizen, person under parole etc.</li>
+				<li><strong>Turnout Rate</strong>: The percentage of VEP who voted.</li>
+				<li><strong>City (population above 700,000)</strong>: Actually not the main focus of the map; Only to show large population area. </li>
+			</ul>
+			<p>More information about the above subjects can be obtained from <a href="http://elections.gmu.edu/FAQ.html">http://elections.gmu.edu/FAQ.html</a></p>
+			<br />
+			
+			<h4>Methodology</h4>
+			<ul>
+				<li>Data is classified using geometrical interval method (this is done automatically by ArcMap)</li>
+				<li>Each classification data has different class with each other. For example, turnout data for 2012 has class [0 - 50%, 50.5% - 70% and 70.5% - 100]
+				while for 2008 has another class. This is done to ensure uniform distribution within each map. </li>
+				<li>The exact figures for each classification (as you can see in legend) is actually rounded for simplification.
+				This might cause conflict between the data in the map against the range it belongs on the legend, so please let me know if there
+				is such case. However, the classification of each state data (indicated by its color in map) is still correct.</li>
+			</ul>
+			<br />
+			
+			<h4>Data Sources</h4>
+				<ul><strong>United States Election Project by Dr Michael McDonald</strong>: 
+						<a href="http://elections.gmu.edu/voter_turnout.htm" target="_blank">http://elections.gmu.edu/voter_turnout.htm</a> </ul>
+				<ul><strong>Bipartisan Policy Website</strong>: 
+						<a href="http://bipartisanpolicy.org/sites/default/files/2012%20Regional%20Turnout.pdf" target="_blank">http://bipartisanpolicy.org/sites/default/files/2012%20Regional%20Turnout.pdf</a></ul>
+				<ul><strong>List of United States urban areas, from Wikipedia</strong>: 
+						<a href="http://en.wikipedia.org/wiki/List_of_United_States_urban_areas" target="_blank">http://en.wikipedia.org/wiki/List_of_United_States_urban_areas</a></ul>
+				<ul><strong>List of United States presidential election results by state</strong>:
+						<a href="http://en.wikipedia.org/wiki/List_of_United_States_presidential_election_results_by_state" target="_blank">http://en.wikipedia.org/wiki/List_of_United_States_presidential_election_results_by_state</a></ul>
+			<br />
+			
+		  </div>
+		  <div class="modal-footer">
+			<button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
+		  </div>
+		</div>
+	</div>
+	
+	<div id="contact_me" style="z-index:1001; position:absolute; top: 90%; left: 10%">
+		<a href="#contact" role="button" class="btn btn-warning" data-toggle="modal">Contact Me</a>
+		<div id="contact" class="modal hide fade" data-backdrop="false" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+		  <div class="modal-header">
+			<button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+			<h3 id="myModalLabel">Contact Me</h3>
+		  </div>
+		  <div class="modal-body">
+			<p>I am Muhammad Ashraf Ishak, currently a computer science student at University of Maryland, College Park. </p>
+			<p>If there is anything wrong with the map, or you just want to give suggestion, email me: 
+			m.ashraf.ishak@gmail.com. I appreciate your feedback, thank you. </p>
+		  </div>
+		  <div class="modal-footer">
+			<button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
+		  </div>
+		</div>
+	</div>
+	
+	<div id="social" style="z-index:1001; position:absolute; top: 90%; left: 20%">
+		<a href="https://twitter.com/share" class="twitter-share-button" data-lang="en" data-url="http://ter.ps/turnout">Tweet</a>
+		<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="https://platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+		<div class="fb-like" data-href="http://ashrafishak.com/turnout_map/" data-send="false" data-width="450" data-show-faces="false"></div>
+	</div>
+	
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="./bootstrap/js/bootstrap-transition.js"></script>
+    <script src="./bootstrap/js/bootstrap-alert.js"></script>
+    <script src="./bootstrap/js/bootstrap-modal.js"></script>
+    <script src="./bootstrap/js/bootstrap-dropdown.js"></script>
+    <script src="./bootstrap/js/bootstrap-scrollspy.js"></script>
+    <script src="./bootstrap/js/bootstrap-tab.js"></script>
+    <script src="./bootstrap/js/bootstrap-collapse.js"></script>
+    <script src="./bootstrap/js/bootstrap-carousel.js"></script>
+    <script src="./bootstrap/js/bootstrap-typeahead.js"></script>
+	
+	
+  </body>
+  
+  
+</html>
